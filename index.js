@@ -4,8 +4,12 @@ const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const jwt = require("jsonwebtoken");
 const dotenv = require("dotenv");
 require("dotenv").config();
-const stripe = require("stripe")(process.env.STRIPE_SECRET_key);
 
+if (!process.env.STRIPE_SECRET_KEY) {
+  throw new Error("STRIPE_SECRET_KEY is not configured");
+}
+
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
 const port = process.env.PORT || 5000;
 const app = express();
@@ -16,11 +20,13 @@ app.use(cors());
 app.use(express.json());
 
 //connect with mondodb
+if (!process.env.DB_USER || !process.env.DB_PASS) {
+  throw new Error("MongoDB credentials are missing");
+}
 
-const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster-nerd-academy.c2dutjx.mongodb.net/?retryWrites=true&w=majority`;
+const uri = `mongodb+srv://${encodeURIComponent(process.env.DB_USER)}:${encodeURIComponent(process.env.DB_PASS)}@cluster-nerd-academy.c2dutjx.mongodb.net/?retryWrites=true&w=majority`;
+
 const client = new MongoClient(uri, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
   serverApi: ServerApiVersion.v1,
 });
 
@@ -42,6 +48,7 @@ async function run() {
     const studentPurchasedCourses = client.db("NERD-ACADEMY").collection("student-purchased-courses");
     const studentOrderHistory = client.db("NERD-ACADEMY").collection("student-order-history");
     const profileCollection = client.db("NERD-ACADEMY").collection("profile");
+    const studentAssignment = client.db("NERD-ACADEMY").collection("studentAssignment");
 
     //save users info in db
     app.post("/users", async (req, res) => {
@@ -226,21 +233,21 @@ async function run() {
     // Stripe API end
 
     // Checking roles API start from here
-    app.get('users/admin/:email', async (req, res) => {
+    app.get('/users/admin/:email', async (req, res) => {
       const email = req.params.email;
       const query = { email };
       const user = await usersCollection.findOne(query);
       res.send({ isAdmin: user?.role === 'admin'});
     })
 
-    app.get('users/teacher/:email', async (req, res) => {
+    app.get('/users/teacher/:email', async (req, res) => {
       const email = req.params.email;
       const query = { email };
       const user = await usersCollection.findOne(query);
       res.send({ isTeacher: user?.role === 'teacher'});
     })
 
-    app.get('users/student/:email', async (req, res) => {
+    app.get('/users/student/:email', async (req, res) => {
       const email = req.params.email;
       const query = { email };
       const user = await usersCollection.findOne(query);
@@ -312,6 +319,15 @@ app.get("/", async (req, res) => {
   res.send("Nerd Academy Server Is Running");
 });
 
-app.listen(port, () => {
-  console.log(`Nerd Academy Server Is Running On ${port}`);
-});
+// app.listen(port, () => {
+//   console.log(`Nerd Academy Server Is Running On ${port}`);
+// });
+
+// Local development server
+if (require.main === module) {
+  app.listen(port, () => {
+    console.log(`Nerd Academy Server Is Running On ${port}`);
+  });
+}
+
+module.exports = app;
